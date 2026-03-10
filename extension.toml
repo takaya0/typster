@@ -1,0 +1,15 @@
+id = "typster"
+name = "Typster"
+description = "Typst language support for Zed with tinymist LSP, PDF preview, and build tasks. Requires Typst 0.14.2 or later."
+version = "0.0.1"
+schema_version = 1
+authors = ["yataka"]
+repository = "https://github.com/yataka/typster"
+
+[language_servers.tinymist]
+name = "Typst language support"
+language = "Typst"
+
+[grammars.typst]
+repository = "https://github.com/uben0/tree-sitter-typst"
+commit = "46cf4ded12ee974a70bf8457263b67ad7ee0379d"

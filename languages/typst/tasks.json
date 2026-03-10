@@ -1,0 +1,20 @@
+[
+    {
+        "label": "typst compile",
+        "command": "typst",
+        "args": ["compile", "$ZED_FILENAME"],
+        "tags": ["typst-build"]
+    },
+    {
+        "label": "typst watch",
+        "command": "typst",
+        "args": ["watch", "$ZED_FILENAME"],
+        "tags": ["typst-build"]
+    },
+    {
+        "label": "typst compile (to PDF)",
+        "command": "typst",
+        "args": ["compile", "--format", "pdf", "$ZED_FILENAME"],
+        "tags": ["typst-build"]
+    }
+]
