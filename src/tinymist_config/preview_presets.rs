@@ -1,10 +1,14 @@
 #![cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
 
+use crate::inverse_search::ViewerKind;
 use crate::platform::Environment;
 
 /// Detected PDF previewer with its forward search configuration.
 #[derive(Debug)]
 pub struct PreviewerConfig {
+    /// Identifies which viewer was detected; usable for inverse search lookup.
+    #[allow(dead_code)]
+    pub viewer: ViewerKind,
     pub forward_search_executable: String,
     pub forward_search_args: Vec<String>,
 }
@@ -23,6 +27,7 @@ pub fn detect_previewer(env: &dyn Environment) -> Option<PreviewerConfig> {
         }
     }) {
         return Some(PreviewerConfig {
+            viewer: ViewerKind::Skim,
             forward_search_executable: skim,
             forward_search_args: vec![
                 "%l".to_string(),
@@ -35,6 +40,7 @@ pub fn detect_previewer(env: &dyn Environment) -> Option<PreviewerConfig> {
     // Windows: SumatraPDF
     if let Some(sumatra) = env.which("SumatraPDF") {
         return Some(PreviewerConfig {
+            viewer: ViewerKind::SumatraPdf,
             forward_search_executable: sumatra,
             forward_search_args: vec![
                 "-forward-search".to_string(),
@@ -48,6 +54,7 @@ pub fn detect_previewer(env: &dyn Environment) -> Option<PreviewerConfig> {
     // Zathura
     if let Some(zathura) = env.which("zathura") {
         return Some(PreviewerConfig {
+            viewer: ViewerKind::Zathura,
             forward_search_executable: zathura,
             forward_search_args: vec![
                 "--synctex-forward".to_string(),
@@ -60,6 +67,7 @@ pub fn detect_previewer(env: &dyn Environment) -> Option<PreviewerConfig> {
     // Sioyek (cross-platform)
     if let Some(sioyek) = env.which("sioyek") {
         return Some(PreviewerConfig {
+            viewer: ViewerKind::Sioyek,
             forward_search_executable: sioyek,
             forward_search_args: vec![
                 "--reuse-window".to_string(),
@@ -78,6 +86,7 @@ pub fn detect_previewer(env: &dyn Environment) -> Option<PreviewerConfig> {
     // Okular
     if let Some(okular) = env.which("okular") {
         return Some(PreviewerConfig {
+            viewer: ViewerKind::Okular,
             forward_search_executable: okular,
             forward_search_args: vec![
                 "--unique".to_string(),
@@ -89,6 +98,7 @@ pub fn detect_previewer(env: &dyn Environment) -> Option<PreviewerConfig> {
     // Evince
     if let Some(evince) = env.which("evince") {
         return Some(PreviewerConfig {
+            viewer: ViewerKind::Evince,
             forward_search_executable: evince,
             forward_search_args: vec![
                 "--forward-search".to_string(),
@@ -123,6 +133,7 @@ mod tests {
             "/Applications/Skim.app/Contents/SharedSupport/displayline"
         );
         assert_eq!(config.forward_search_args, vec!["%l", "%p", "%i"]);
+        assert_eq!(config.viewer, ViewerKind::Skim);
     }
 
     #[test]
@@ -133,6 +144,7 @@ mod tests {
         assert!(config
             .forward_search_args
             .contains(&"--synctex-forward".to_string()));
+        assert_eq!(config.viewer, ViewerKind::Zathura);
     }
 
     #[test]
@@ -144,6 +156,7 @@ mod tests {
         assert!(config
             .forward_search_executable
             .contains("displayline"));
+        assert_eq!(config.viewer, ViewerKind::Skim);
     }
 
     #[test]
@@ -151,6 +164,7 @@ mod tests {
         let env = FakeEnv::new().with_binary("sioyek");
         let config = detect_previewer(&env).unwrap();
         assert_eq!(config.forward_search_args[0], "--reuse-window");
+        assert_eq!(config.viewer, ViewerKind::Sioyek);
     }
 
     #[test]
@@ -158,6 +172,7 @@ mod tests {
         let env = FakeEnv::new().with_binary("okular");
         let config = detect_previewer(&env).unwrap();
         assert!(config.forward_search_args[1].contains("src:"));
+        assert_eq!(config.viewer, ViewerKind::Okular);
     }
 
     #[test]
@@ -165,5 +180,6 @@ mod tests {
         let env = FakeEnv::new().with_binary("evince");
         let config = detect_previewer(&env).unwrap();
         assert_eq!(config.forward_search_args[0], "--forward-search");
+        assert_eq!(config.viewer, ViewerKind::Evince);
     }
 }

@@ -1,3 +1,4 @@
+pub mod inverse_search;
 pub mod platform;
 mod tinymist_config;
 mod tinymist_invocation;
