@@ -2,6 +2,7 @@
 
 use crate::inverse_search::ViewerKind;
 use crate::platform::Environment;
+use serde_json::{Map, Value};
 
 /// Detected PDF previewer with its forward search configuration.
 #[derive(Debug)]
@@ -13,62 +14,53 @@ pub struct PreviewerConfig {
     pub forward_search_args: Vec<String>,
 }
 
-/// Detect an available PDF previewer and return its forward search config.
-/// Priority order matches zed-latex: Skim (macOS), SumatraPDF (Windows),
-/// then Zathura, Sioyek, Okular, Evince (Linux/cross-platform).
-pub fn detect_previewer(env: &dyn Environment) -> Option<PreviewerConfig> {
-    // macOS: Skim
-    let skim_path = "/Applications/Skim.app/Contents/SharedSupport/displayline";
-    if let Some(skim) = env.which("skimapp").or_else(|| {
-        if env.path_exists(skim_path) {
-            Some(skim_path.to_string())
-        } else {
-            None
+/// Return the forward search configuration for a specific viewer kind,
+/// if that viewer's binary or application path is available on the system.
+/// Returns `None` if the viewer is not installed or if the kind is `BuiltinPreview`.
+pub fn config_for_viewer(viewer: ViewerKind, env: &dyn Environment) -> Option<PreviewerConfig> {
+    match viewer {
+        ViewerKind::Skim => {
+            let skim_path = "/Applications/Skim.app/Contents/SharedSupport/displayline";
+            env.which("skimapp")
+                .or_else(|| {
+                    if env.path_exists(skim_path) {
+                        Some(skim_path.to_string())
+                    } else {
+                        None
+                    }
+                })
+                .map(|exe| PreviewerConfig {
+                    viewer: ViewerKind::Skim,
+                    forward_search_executable: exe,
+                    forward_search_args: vec![
+                        "%l".to_string(),
+                        "%p".to_string(),
+                        "%i".to_string(),
+                    ],
+                })
         }
-    }) {
-        return Some(PreviewerConfig {
-            viewer: ViewerKind::Skim,
-            forward_search_executable: skim,
-            forward_search_args: vec![
-                "%l".to_string(),
-                "%p".to_string(),
-                "%i".to_string(),
-            ],
-        });
-    }
-
-    // Windows: SumatraPDF
-    if let Some(sumatra) = env.which("SumatraPDF") {
-        return Some(PreviewerConfig {
+        ViewerKind::SumatraPdf => env.which("SumatraPDF").map(|exe| PreviewerConfig {
             viewer: ViewerKind::SumatraPdf,
-            forward_search_executable: sumatra,
+            forward_search_executable: exe,
             forward_search_args: vec![
                 "-forward-search".to_string(),
                 "%i".to_string(),
                 "%l".to_string(),
                 "%p".to_string(),
             ],
-        });
-    }
-
-    // Zathura
-    if let Some(zathura) = env.which("zathura") {
-        return Some(PreviewerConfig {
+        }),
+        ViewerKind::Zathura => env.which("zathura").map(|exe| PreviewerConfig {
             viewer: ViewerKind::Zathura,
-            forward_search_executable: zathura,
+            forward_search_executable: exe,
             forward_search_args: vec![
                 "--synctex-forward".to_string(),
                 "%l:1:%i".to_string(),
                 "%p".to_string(),
             ],
-        });
-    }
-
-    // Sioyek (cross-platform)
-    if let Some(sioyek) = env.which("sioyek") {
-        return Some(PreviewerConfig {
+        }),
+        ViewerKind::Sioyek => env.which("sioyek").map(|exe| PreviewerConfig {
             viewer: ViewerKind::Sioyek,
-            forward_search_executable: sioyek,
+            forward_search_executable: exe,
             forward_search_args: vec![
                 "--reuse-window".to_string(),
                 "--execute-command".to_string(),
@@ -80,36 +72,60 @@ pub fn detect_previewer(env: &dyn Environment) -> Option<PreviewerConfig> {
                 "--open".to_string(),
                 "%p".to_string(),
             ],
-        });
-    }
-
-    // Okular
-    if let Some(okular) = env.which("okular") {
-        return Some(PreviewerConfig {
+        }),
+        ViewerKind::Okular => env.which("okular").map(|exe| PreviewerConfig {
             viewer: ViewerKind::Okular,
-            forward_search_executable: okular,
+            forward_search_executable: exe,
             forward_search_args: vec![
                 "--unique".to_string(),
                 "file:%p#src:%l%i".to_string(),
             ],
-        });
-    }
-
-    // Evince
-    if let Some(evince) = env.which("evince") {
-        return Some(PreviewerConfig {
+        }),
+        ViewerKind::Evince => env.which("evince").map(|exe| PreviewerConfig {
             viewer: ViewerKind::Evince,
-            forward_search_executable: evince,
+            forward_search_executable: exe,
             forward_search_args: vec![
                 "--forward-search".to_string(),
                 "%i".to_string(),
                 "%l".to_string(),
                 "%p".to_string(),
             ],
-        });
+        }),
+        ViewerKind::BuiltinPreview => None,
     }
+}
 
-    None
+/// Detect an available PDF previewer and return its forward search config.
+/// Priority order matches zed-latex: Skim (macOS), SumatraPDF (Windows),
+/// then Zathura, Sioyek, Okular, Evince (Linux/cross-platform).
+pub fn detect_previewer(env: &dyn Environment) -> Option<PreviewerConfig> {
+    const PRIORITY: &[ViewerKind] = &[
+        ViewerKind::Skim,
+        ViewerKind::SumatraPdf,
+        ViewerKind::Zathura,
+        ViewerKind::Sioyek,
+        ViewerKind::Okular,
+        ViewerKind::Evince,
+    ];
+    PRIORITY
+        .iter()
+        .find_map(|&kind| config_for_viewer(kind, env))
+}
+
+/// Return the minimum configuration to enable tinymist's built-in preview server.
+/// Used as fallback when no external PDF viewer is detected.
+///
+/// Only `background.enabled` is set here; all other `preview.*` keys use tinymist's
+/// own defaults (requires tinymist ≥ 0.13.6).
+/// The returned map is intended to be inserted as the value of the `"preview"` key
+/// in the workspace configuration sent to tinymist.
+pub fn builtin_preview_defaults() -> Map<String, Value> {
+    let mut preview = Map::new();
+    preview.insert(
+        "background".to_string(),
+        serde_json::json!({ "enabled": true }),
+    );
+    preview
 }
 
 #[cfg(test)]
@@ -153,9 +169,7 @@ mod tests {
             .with_path("/Applications/Skim.app/Contents/SharedSupport/displayline")
             .with_binary("zathura");
         let config = detect_previewer(&env).unwrap();
-        assert!(config
-            .forward_search_executable
-            .contains("displayline"));
+        assert!(config.forward_search_executable.contains("displayline"));
         assert_eq!(config.viewer, ViewerKind::Skim);
     }
 
@@ -181,5 +195,31 @@ mod tests {
         let config = detect_previewer(&env).unwrap();
         assert_eq!(config.forward_search_args[0], "--forward-search");
         assert_eq!(config.viewer, ViewerKind::Evince);
+    }
+
+    #[test]
+    fn config_for_viewer_returns_skim_config_when_path_exists() {
+        let env = FakeEnv::new()
+            .with_path("/Applications/Skim.app/Contents/SharedSupport/displayline");
+        let config = config_for_viewer(ViewerKind::Skim, &env).unwrap();
+        assert_eq!(config.viewer, ViewerKind::Skim);
+    }
+
+    #[test]
+    fn config_for_viewer_returns_none_when_skim_not_installed() {
+        let env = FakeEnv::new();
+        assert!(config_for_viewer(ViewerKind::Skim, &env).is_none());
+    }
+
+    #[test]
+    fn config_for_viewer_returns_none_for_builtin_preview() {
+        let env = FakeEnv::new();
+        assert!(config_for_viewer(ViewerKind::BuiltinPreview, &env).is_none());
+    }
+
+    #[test]
+    fn builtin_preview_defaults_enables_background_server() {
+        let defaults = builtin_preview_defaults();
+        assert_eq!(defaults["background"]["enabled"], true);
     }
 }

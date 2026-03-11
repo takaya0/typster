@@ -7,6 +7,8 @@ pub enum ViewerKind {
     Sioyek,
     Okular,
     Evince,
+    /// tinymist's built-in browser preview server (no external viewer needed).
+    BuiltinPreview,
 }
 
 /// Setup information for configuring inverse search (PDF → source) in a viewer.
@@ -67,6 +69,13 @@ pub fn inverse_search_setup(viewer: ViewerKind) -> InverseSearchSetup {
             editor_args: None,
             setup_location:
                 "Evince uses D-Bus for inverse search; direct editor configuration is not supported",
+        },
+        ViewerKind::BuiltinPreview => InverseSearchSetup {
+            viewer,
+            editor_command: None,
+            editor_args: None,
+            setup_location:
+                "Built-in preview handles inverse search via WebSocket; no manual setup required",
         },
     }
 }
@@ -134,5 +143,21 @@ mod tests {
         let args = setup.editor_args.unwrap();
         assert!(args.contains("%1"), "args should contain %1 placeholder");
         assert!(args.contains("%2"), "args should contain %2 placeholder");
+    }
+
+    #[test]
+    fn inverse_search_setup_returns_no_command_for_builtin_preview() {
+        let setup = inverse_search_setup(ViewerKind::BuiltinPreview);
+        assert_eq!(setup.editor_command, None);
+        assert_eq!(setup.editor_args, None);
+    }
+
+    #[test]
+    fn inverse_search_setup_builtin_preview_indicates_no_manual_setup() {
+        let setup = inverse_search_setup(ViewerKind::BuiltinPreview);
+        assert!(
+            setup.setup_location.contains("WebSocket"),
+            "setup_location should mention WebSocket"
+        );
     }
 }
