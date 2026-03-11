@@ -4,9 +4,59 @@
 
 **Inverse Search** とは、PDF ビューワー上でクリックすると、対応する Typst ソースファイルの該当行に Zed エディタがジャンプする機能です。
 
-### なぜビューワー側の設定が必要か
+Typster は 2 種類のプレビュー方式に対応しています:
 
-Forward Search（ソース → PDF）は Typster が tinymist LSP へ設定を渡すため自動で動作します。一方、Inverse Search はビューワーがエディタを呼び出す仕組みのため、**各ビューワーのアプリ設定でコマンドを登録する必要があります**。Typster はこの設定を自動化できません。
+- **ブラウザプレビュー**（推奨・設定不要）: 外部ビューワーが検出されない場合、tinymist のバックグラウンドプレビューサーバーが自動的に有効化されます。ブラウザ（Chrome など）で `http://127.0.0.1:23635` を開くと SVG ベースのプレビューが表示され、Forward/Inverse Search は WebSocket 経由で自動的に動作します。
+- **外部ビューワー**（手動設定が必要）: Skim, SumatraPDF, Zathura など PDF ビューワーをインストールすると自動検出されます。Forward Search は自動設定されますが、Inverse Search はビューワー側でエディタコマンドを登録する必要があります。
+
+> **ブラウザプレビューの要件**: tinymist バージョン 0.13.6 以降が必要です。PATH 上にそれより古い tinymist がある場合はアップデートするか、設定で `lsp.tinymist.binary.path` に最新バイナリのパスを指定してください。
+
+### プレビューワーの指定方法
+
+Zed の `settings.json` で `typsterPreviewer` キーを指定することで、使用するプレビューワーを明示的に選択できます:
+
+```json
+{
+  "lsp": {
+    "tinymist": {
+      "settings": {
+        "typsterPreviewer": "browser"
+      }
+    }
+  }
+}
+```
+
+指定可能な値:
+
+| 値 | 説明 |
+|----|------|
+| `"auto"` | 自動検出（デフォルト）。外部ビューワーが見つからない場合はビルトインにフォールバック |
+| `"browser"` | tinymist のブラウザプレビュー（Chrome など任意のブラウザで利用可）|
+| `"skim"` | Skim（macOS）|
+| `"sumatrapdf"` | SumatraPDF（Windows）|
+| `"zathura"` | Zathura（Linux）|
+| `"sioyek"` | Sioyek（クロスプラットフォーム）|
+| `"okular"` | Okular（Linux / KDE）|
+| `"evince"` | Evince（Linux / GNOME）|
+
+> **注意**: 外部ビューワーを指定したがインストールされていない場合、自動的にブラウザプレビューにフォールバックします。
+
+### ブラウザプレビューの使い方
+
+1. `typsterPreviewer: "browser"` を設定するか、外部 PDF ビューワーをインストールしていない状態で Typst ファイルを開く
+2. ブラウザ（Chrome など）で `http://127.0.0.1:23635` にアクセス
+3. PDF をエクスポートせずリアルタイムプレビューが確認できます
+4. ブラウザ上でクリックすると Zed の対応行にジャンプします（Inverse Search）
+5. Zed でカーソルを動かすとブラウザのスクロール位置も追従します（Forward Search）
+
+> **注意**: ユーザー設定で `preview` キーを部分的に上書きすると、自動設定の `preview` オブジェクト全体が置き換わります。これは既存の `forwardSearch` と同じ動作です。`background.enabled` を維持したまま他のキーを変更する場合は、`preview` オブジェクト全体を設定してください。
+
+---
+
+### なぜ外部ビューワーには手動設定が必要か
+
+Inverse Search はビューワーがエディタを呼び出す仕組みのため、**各ビューワーのアプリ設定でコマンドを登録する必要があります**。Typster はこの設定を自動化できません。
 
 ## 前提条件
 
