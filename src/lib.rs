@@ -1,6 +1,7 @@
 mod code_label;
 pub mod inverse_search;
 pub mod platform;
+mod slash_commands;
 mod tinymist_config;
 mod tinymist_invocation;
 
@@ -76,6 +77,53 @@ impl zed::Extension for TypsterExtension {
         symbol: zed::lsp::Symbol,
     ) -> Option<zed::CodeLabel> {
         code_label::label_for_symbol(&symbol)
+    }
+
+    fn complete_slash_command_argument(
+        &self,
+        command: zed::SlashCommand,
+        args: Vec<String>,
+    ) -> Result<Vec<zed::SlashCommandArgumentCompletion>> {
+        let completions = match command.name.as_str() {
+            "typst-docs" => slash_commands::complete_typst_docs(&args),
+            "typst-symbols" => slash_commands::complete_typst_symbols(&args),
+            _ => return Ok(vec![]),
+        };
+        Ok(completions
+            .into_iter()
+            .map(|c| zed::SlashCommandArgumentCompletion {
+                label: c.label,
+                new_text: c.new_text,
+                run_command: c.run_command,
+            })
+            .collect())
+    }
+
+    fn run_slash_command(
+        &self,
+        command: zed::SlashCommand,
+        args: Vec<String>,
+        _worktree: Option<&zed::Worktree>,
+    ) -> Result<zed::SlashCommandOutput> {
+        let output = match command.name.as_str() {
+            "typst-docs" => slash_commands::run_typst_docs(&args),
+            "typst-symbols" => slash_commands::run_typst_symbols(&args),
+            _ => Err(format!("Unknown command: {}", command.name)),
+        }?;
+        Ok(zed::SlashCommandOutput {
+            text: output.text,
+            sections: output
+                .sections
+                .into_iter()
+                .map(|s| zed::SlashCommandOutputSection {
+                    range: zed::Range {
+                        start: s.range.start as u32,
+                        end: s.range.end as u32,
+                    },
+                    label: s.label,
+                })
+                .collect(),
+        })
     }
 }
 
