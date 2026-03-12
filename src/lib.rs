@@ -1,3 +1,4 @@
+mod code_label;
 pub mod inverse_search;
 pub mod platform;
 mod tinymist_config;
@@ -59,6 +60,22 @@ impl zed::Extension for TypsterExtension {
             worktree,
         );
         Ok(config)
+    }
+
+    fn label_for_completion(
+        &self,
+        _language_server_id: &zed::LanguageServerId,
+        completion: zed::lsp::Completion,
+    ) -> Option<zed::CodeLabel> {
+        code_label::label_for_completion(&completion)
+    }
+
+    fn label_for_symbol(
+        &self,
+        _language_server_id: &zed::LanguageServerId,
+        symbol: zed::lsp::Symbol,
+    ) -> Option<zed::CodeLabel> {
+        code_label::label_for_symbol(&symbol)
     }
 }
 
