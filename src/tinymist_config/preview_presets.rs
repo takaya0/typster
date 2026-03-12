@@ -115,8 +115,9 @@ pub fn detect_previewer(env: &dyn Environment) -> Option<PreviewerConfig> {
 /// Return the minimum configuration to enable tinymist's built-in preview server.
 /// Used as fallback when no external PDF viewer is detected.
 ///
-/// Only `background.enabled` is set here; all other `preview.*` keys use tinymist's
-/// own defaults (requires tinymist ≥ 0.13.6).
+/// Sets `background.enabled` to start the preview server in the background, and
+/// `refresh` to `"onType"` for real-time preview updates while editing.
+/// All other `preview.*` keys use tinymist's own defaults (requires tinymist ≥ 0.13.6).
 /// The returned map is intended to be inserted as the value of the `"preview"` key
 /// in the workspace configuration sent to tinymist.
 pub fn builtin_preview_defaults() -> Map<String, Value> {
@@ -124,6 +125,10 @@ pub fn builtin_preview_defaults() -> Map<String, Value> {
     preview.insert(
         "background".to_string(),
         serde_json::json!({ "enabled": true }),
+    );
+    preview.insert(
+        "refresh".to_string(),
+        Value::String("onType".to_string()),
     );
     preview
 }
@@ -221,5 +226,11 @@ mod tests {
     fn builtin_preview_defaults_enables_background_server() {
         let defaults = builtin_preview_defaults();
         assert_eq!(defaults["background"]["enabled"], true);
+    }
+
+    #[test]
+    fn builtin_preview_defaults_sets_refresh_on_type() {
+        let defaults = builtin_preview_defaults();
+        assert_eq!(defaults["refresh"], "onType");
     }
 }

@@ -151,13 +151,19 @@ pub fn build_auto_detected_config(
     map
 }
 
-/// Shallow-merge auto-detected config with user settings.
-/// User settings override auto-detected values key-by-key at the top level.
+/// Deep-merge auto-detected config with user settings.
+/// User settings override auto-detected values recursively.
+/// For non-object values (strings, numbers, arrays, etc.), user settings always win.
 pub fn merge_configs(auto_detected: Value, user_settings: Value) -> Value {
     match (auto_detected, user_settings) {
         (Value::Object(mut base), Value::Object(overrides)) => {
             for (key, value) in overrides {
-                base.insert(key, value);
+                let merged = if let Some(existing) = base.remove(&key) {
+                    merge_configs(existing, value)
+                } else {
+                    value
+                };
+                base.insert(key, merged);
             }
             Value::Object(base)
         }
@@ -222,6 +228,53 @@ mod tests {
     }
 
     #[test]
+    fn merge_configs_deep_merges_nested_objects_when_both_sides_have_object() {
+        // Issue #15 core scenario: user sets preview.refresh without losing preview.background.
+        let auto = json!({"preview": {"background": {"enabled": true}, "refresh": "onType"}});
+        let user = json!({"preview": {"refresh": "onSave"}});
+        let merged = merge_configs(auto, user);
+        assert_eq!(merged["preview"]["background"]["enabled"], true);
+        assert_eq!(merged["preview"]["refresh"], "onSave");
+    }
+
+    #[test]
+    fn merge_configs_replaces_leaf_value_when_user_overrides_object_with_scalar() {
+        let auto = json!({"preview": {"background": {"enabled": true}}});
+        let user = json!({"preview": "disabled"});
+        let merged = merge_configs(auto, user);
+        assert_eq!(merged["preview"], "disabled");
+    }
+
+    #[test]
+    fn merge_configs_replaces_array_when_user_provides_array() {
+        let auto = json!({"forwardSearch": {"args": ["--a", "--b"]}});
+        let user = json!({"forwardSearch": {"args": ["--c"]}});
+        let merged = merge_configs(auto, user);
+        assert_eq!(merged["forwardSearch"]["args"], json!(["--c"]));
+    }
+
+    #[test]
+    fn merge_configs_deep_merges_three_levels_when_both_sides_have_nested_objects() {
+        let auto = json!({"a": {"b": {"c": 1, "d": 2}}});
+        let user = json!({"a": {"b": {"c": 99}}});
+        let merged = merge_configs(auto, user);
+        assert_eq!(merged["a"]["b"]["c"], 99);
+        assert_eq!(merged["a"]["b"]["d"], 2);
+    }
+
+    #[test]
+    fn merge_configs_preserves_browser_preview_background_when_user_sets_only_refresh() {
+        // E2E scenario: auto-detected config has preview.background.enabled, user sets preview.refresh.
+        let env = FakeEnv::new();
+        let auto_config = build_auto_detected_config(&env, PreviewerChoice::Browser);
+        let auto_value = Value::Object(auto_config);
+        let user = json!({"preview": {"refresh": "onSave"}});
+        let merged = merge_configs(auto_value, user);
+        assert_eq!(merged["preview"]["background"]["enabled"], true);
+        assert_eq!(merged["preview"]["refresh"], "onSave");
+    }
+
+    #[test]
     fn build_auto_detected_config_sets_typstyle_when_available() {
         let env = FakeEnv::new().with_binary("typstyle");
         let config = build_auto_detected_config(&env, PreviewerChoice::Auto);
@@ -276,6 +329,7 @@ mod tests {
         let env = FakeEnv::new();
         let config = build_auto_detected_config(&env, PreviewerChoice::Auto);
         assert_eq!(config["preview"]["background"]["enabled"], true);
+        assert_eq!(config["preview"]["refresh"], "onType");
     }
 
     #[test]
@@ -314,6 +368,7 @@ mod tests {
         let env = FakeEnv::new().with_binary("zathura");
         let config = build_auto_detected_config(&env, PreviewerChoice::Browser);
         assert_eq!(config["preview"]["background"]["enabled"], true);
+        assert_eq!(config["preview"]["refresh"], "onType");
         assert_eq!(config["exportPdf"], "never");
         assert!(!config.contains_key("forwardSearch"));
     }
@@ -337,6 +392,7 @@ mod tests {
         let env = FakeEnv::new();
         let config = build_auto_detected_config(&env, PreviewerChoice::Skim);
         assert_eq!(config["preview"]["background"]["enabled"], true);
+        assert_eq!(config["preview"]["refresh"], "onType");
         assert_eq!(config["exportPdf"], "never");
         assert!(!config.contains_key("forwardSearch"));
     }
