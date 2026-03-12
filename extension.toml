@@ -13,3 +13,13 @@ language = "Typst"
 [grammars.typst]
 repository = "https://github.com/uben0/tree-sitter-typst"
 commit = "46cf4ded12ee974a70bf8457263b67ad7ee0379d"
+
+[slash_commands.typst-docs]
+description = "Show Typst standard library function documentation (signature, parameters, examples)"
+requires_argument = true
+tooltip_text = "Insert Typst function documentation as context"
+
+[slash_commands.typst-symbols]
+description = "Show Typst math symbols by category (arrow, greek, operator, relation, set, logic, accent, misc)"
+requires_argument = true
+tooltip_text = "Insert Typst symbol list as context"
