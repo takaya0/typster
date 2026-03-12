@@ -16,5 +16,23 @@
         "command": "typst",
         "args": ["compile", "--format", "pdf", "$ZED_FILENAME"],
         "tags": ["typst-build"]
+    },
+    {
+        "label": "typst compile (to SVG)",
+        "command": "typst",
+        "args": ["compile", "--format", "svg", "$ZED_FILENAME"],
+        "tags": ["typst-build"]
+    },
+    {
+        "label": "typst compile (to PNG)",
+        "command": "typst",
+        "args": ["compile", "--format", "png", "$ZED_FILENAME"],
+        "tags": ["typst-build"]
+    },
+    {
+        "label": "typst fonts",
+        "command": "typst",
+        "args": ["fonts", "--variants"],
+        "tags": ["typst-build"]
     }
 ]
