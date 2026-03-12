@@ -33,3 +33,8 @@
 (formula
   "$" @fold
   "$" @fold.end)
+
+; Raw (fenced code) blocks
+(raw_blck
+  "`" @fold
+  "`" @fold.end)
